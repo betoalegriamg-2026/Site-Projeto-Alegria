@@ -1,0 +1,146 @@
+{
+  "theme": "light",
+  "archetype": "Vibrant Play",
+  "typography": {
+    "font_imports": [
+      "@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap');"
+    ],
+    "headings": {
+      "family": "'Fredoka', sans-serif",
+      "weights": [
+        "600",
+        "700"
+      ],
+      "sizes": {
+        "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight",
+        "h2": "text-3xl sm:text-4xl lg:text-5xl tracking-tight",
+        "h3": "text-2xl sm:text-3xl",
+        "h4": "text-xl sm:text-2xl"
+      }
+    },
+    "body": {
+      "family": "'Nunito', sans-serif",
+      "weights": [
+        "400",
+        "500",
+        "600"
+      ],
+      "sizes": {
+        "base": "text-base leading-relaxed",
+        "large": "text-lg leading-relaxed",
+        "small": "text-sm",
+        "label": "text-xs uppercase tracking-widest font-bold"
+      }
+    }
+  },
+  "colors": {
+    "background": {
+      "default": "#FFFFFF",
+      "subtle": "#F8FAFC",
+      "surface": "#FFFFFF"
+    },
+    "primary": {
+      "default": "#118AB2",
+      "hover": "#0D6E8E",
+      "light": "#DFF3F9",
+      "text": "#FFFFFF"
+    },
+    "secondary": {
+      "default": "#FFD166",
+      "hover": "#F0B935",
+      "light": "#FFF3D0",
+      "text": "#073B4C"
+    },
+    "accent": {
+      "pink": "#EF476F",
+      "green": "#06D6A0"
+    },
+    "text": {
+      "primary": "#073B4C",
+      "secondary": "#3E5C66",
+      "muted": "#7A929C"
+    },
+    "border": "#E2E8F0"
+  },
+  "spacing_and_layout": {
+    "general": "Generous spacing. Use p-6, p-8, p-12. Avoid cramped layouts.",
+    "border_radius": "rounded-2xl or rounded-3xl for a soft, friendly, and safe feel.",
+    "marketing_grid": "Mode A: The Tetris Grid. Use wide gaps (gap-8) and mixed span sizes to create visual interest. Asymmetry is preferred.",
+    "dashboard_grid": "Mode B: Control Room Grid. Tighter gaps (gap-4). Every pixel utilized, structured, clean, card-based.",
+    "alignment": "Left-align dense text and data. Center-align hero text and large marketing call-to-actions."
+  },
+  "surfaces": {
+    "header": "Crystal Glassmorphism: bg-white/80 backdrop-blur-xl border-b border-blue-100 shadow-sm",
+    "cards": "Soft UI: flat white backgrounds with very subtle soft shadows (shadow-[0_8px_30px_rgb(0,0,0,0.04)]) and a 1px border of border-blue-50.",
+    "footer": "Solid colored background, Primary Blue (#118AB2) with white text, providing strong contrast and closing out the page securely."
+  },
+  "motion_and_interactions": {
+    "hover": "Buttons should lift up slightly (-translate-y-1) and increase shadow. Primary buttons use a scale-105 effect on hover.",
+    "transitions": "Use 'transition-all duration-300 ease-out'",
+    "focus": "focus:ring-2 focus:ring-primary focus:outline-none focus:ring-offset-2"
+  },
+  "component_rules": {
+    "buttons": "Fully rounded (rounded-full) for primary marketing CTAs to feel pill-shaped and playful. Admin dashboard can use rounded-xl.",
+    "inputs": "Shadcn UI but with rounded-xl, light background (bg-gray-50), and no harsh dark borders. Focus state must be clearly visible.",
+    "tables": "Shadcn table for admin area. Keep rows spacious (py-4), text-sm, distinct header row background (bg-blue-50/50).",
+    "icons": "Use lucide-react. Stroke width 2.5 for a slightly bolder, friendlier appearance.",
+    "charts": "Recharts or Shadcn Charts for admin dashboards. Use the primary (#118AB2) and secondary (#FFD166) colors for bars/lines."
+  },
+  "image_urls": {
+    "hero_background": {
+      "url": "https://images.pexels.com/photos/7135004/pexels-photo-7135004.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Soft yellow and blue gradient for the hero background",
+      "placement": "Marketing Hero Section Background"
+    },
+    "hero_main": {
+      "url": "https://images.pexels.com/photos/36239118/pexels-photo-36239118.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Smiling kids posing playfully outdoors",
+      "placement": "Marketing Hero Section Main Visual"
+    },
+    "about_us": {
+      "url": "https://images.pexels.com/photos/2883380/pexels-photo-2883380.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Portrait of smiling children",
+      "placement": "About Us Section"
+    },
+    "classes_dance": {
+      "url": "https://images.pexels.com/photos/7337604/pexels-photo-7337604.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Energetic dance class indoors",
+      "placement": "Classes Catalog - Dance/Zumba"
+    },
+    "classes_art": {
+      "url": "https://images.pexels.com/photos/7026054/pexels-photo-7026054.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Girls painting indoors",
+      "placement": "Classes Catalog - Arts & Painting"
+    },
+    "classes_martial_arts": {
+      "url": "https://images.pexels.com/photos/6765015/pexels-photo-6765015.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Children practicing judo",
+      "placement": "Classes Catalog - Jiu-jitsu/Judo"
+    },
+    "classes_swimming": {
+      "url": "https://images.pexels.com/photos/6011945/pexels-photo-6011945.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Child learning to swim",
+      "placement": "Classes Catalog - Swimming"
+    },
+    "classes_pilates": {
+      "url": "https://images.unsplash.com/photo-1769095209985-346bf992a62e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDZ8MHwxfHNlYXJjaHwxfHxraWRzJTIwcGlsYXRlcyUyMHlvZ2ElMjBjbGFzc3xlbnwwfHx8fDE3NzQ1ODg5OTB8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Young girl meditating",
+      "placement": "Classes Catalog - Pilates"
+    },
+    "testimonial_avatar_1": {
+      "url": "https://images.unsplash.com/photo-1761048370427-494e01030f97?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwxfHxjaGlsZHJlbiUyMHNtaWxpbmclMjBoYXBweSUyMGNvbW11bml0eXxlbnwwfHx8fDE3NzQ1ODg5ODN8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Children looking out window",
+      "placement": "Testimonials/Projects/Gallery"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Follow the Vibrant Play archetype strictly: Use the provided Yellow (#FFD166) and Sky Blue (#118AB2) palettes. Avoid sterile, corporate vibes.",
+    "Use 'Fredoka' for all headings and 'Nunito' for body text. Headings must be bold and tightly tracked to feel youthful.",
+    "Marketing pages must use large border-radii (rounded-2xl, rounded-3xl, or rounded-full for pills/buttons) to convey friendliness.",
+    "Never use generic placeholder images. Use ONLY the URLs provided in the image_urls section for all visual content.",
+    "Build the Admin Dashboard area using customized Shadcn components with softer borders (rounded-xl), subtle shadows, and clear primary blue accents.",
+    "All interactive elements MUST include a 'data-testid' attribute (e.g., data-testid='enrollment-submit-btn', data-testid='nav-about').",
+    "Hero section: Overlay text properly. If using the soft abstract background, ensure high contrast for the text using the navy text color (#073B4C).",
+    "Avoid centering everything. Use bento-box asymmetric layouts for the Projects and Classes sections on the marketing site."
+  ]
+}
