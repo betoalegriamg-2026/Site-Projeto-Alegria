@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -16,13 +16,23 @@ import bcrypt
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # JWT Configuration
-JWT_SECRET = os.environ.get('JWT_SECRET', 'projeto-alegria-secret-key-2024')
+JWT_SECRET = os.environ.get('JWT_SECRET')
+if not JWT_SECRET:
+    JWT_SECRET = os.urandom(32).hex()
+    logger.warning("JWT_SECRET not set in environment, using random secret (sessions will not persist across restarts)")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
@@ -33,13 +43,6 @@ app = FastAPI(title="Projeto Alegria API")
 api_router = APIRouter(prefix="/api")
 
 security = HTTPBearer()
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 # ==================== MODELS ====================
 
@@ -403,9 +406,22 @@ async def list_classes(status: Optional[str] = None):
         query["status"] = status
     
     classes = await db.classes.find(query, {"_id": 0}).to_list(100)
+    
+    # Batch query for enrollment counts using aggregation
+    class_ids = [c["id"] for c in classes]
+    enrollment_counts = {}
+    
+    if class_ids:
+        pipeline = [
+            {"$match": {"class_id": {"$in": class_ids}, "status": "active"}},
+            {"$group": {"_id": "$class_id", "count": {"$sum": 1}}}
+        ]
+        counts = await db.enrollments.aggregate(pipeline).to_list(100)
+        enrollment_counts = {c["_id"]: c["count"] for c in counts}
+    
     result = []
     for c in classes:
-        count = await db.enrollments.count_documents({"class_id": c["id"], "status": "active"})
+        count = enrollment_counts.get(c["id"], 0)
         result.append(ClassResponse(**c, enrolled_count=count))
     return result
 
@@ -482,14 +498,25 @@ async def list_enrollments(
     
     enrollments = await db.enrollments.find(query, {"_id": 0}).to_list(1000)
     
+    if not enrollments:
+        return []
+    
+    # Batch fetch students and classes
+    student_ids = list(set(e["student_id"] for e in enrollments))
+    class_ids = list(set(e["class_id"] for e in enrollments))
+    
+    students = await db.students.find({"id": {"$in": student_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(len(student_ids))
+    classes = await db.classes.find({"id": {"$in": class_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(len(class_ids))
+    
+    student_map = {s["id"]: s.get("name") for s in students}
+    class_map = {c["id"]: c.get("name") for c in classes}
+    
     result = []
     for e in enrollments:
-        student = await db.students.find_one({"id": e["student_id"]}, {"_id": 0, "name": 1})
-        cls = await db.classes.find_one({"id": e["class_id"]}, {"_id": 0, "name": 1})
         result.append(EnrollmentResponse(
             **e,
-            student_name=student.get("name") if student else None,
-            class_name=cls.get("name") if cls else None
+            student_name=student_map.get(e["student_id"]),
+            class_name=class_map.get(e["class_id"])
         ))
     return result
 
@@ -567,16 +594,28 @@ async def list_attendance(
     
     records = await db.attendance.find(query, {"_id": 0}).to_list(5000)
     
+    if not records:
+        return []
+    
+    # Batch fetch enrollments, students, and classes
+    enrollment_ids = list(set(r["enrollment_id"] for r in records))
+    enrollments = await db.enrollments.find({"id": {"$in": enrollment_ids}}, {"_id": 0}).to_list(len(enrollment_ids))
+    enrollment_map = {e["id"]: e for e in enrollments}
+    
+    student_ids = list(set(e.get("student_id") for e in enrollments if e.get("student_id")))
+    class_ids = list(set(e.get("class_id") for e in enrollments if e.get("class_id")))
+    
+    students = await db.students.find({"id": {"$in": student_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(len(student_ids)) if student_ids else []
+    classes = await db.classes.find({"id": {"$in": class_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(len(class_ids)) if class_ids else []
+    
+    student_map = {s["id"]: s.get("name") for s in students}
+    class_map = {c["id"]: c.get("name") for c in classes}
+    
     result = []
     for r in records:
-        enrollment = await db.enrollments.find_one({"id": r["enrollment_id"]}, {"_id": 0})
-        student_name = None
-        class_name = None
-        if enrollment:
-            student = await db.students.find_one({"id": enrollment["student_id"]}, {"_id": 0, "name": 1})
-            cls = await db.classes.find_one({"id": enrollment["class_id"]}, {"_id": 0, "name": 1})
-            student_name = student.get("name") if student else None
-            class_name = cls.get("name") if cls else None
+        enrollment = enrollment_map.get(r["enrollment_id"], {})
+        student_name = student_map.get(enrollment.get("student_id"))
+        class_name = class_map.get(enrollment.get("class_id"))
         
         result.append(AttendanceResponse(
             id=r["id"],
@@ -624,10 +663,17 @@ async def list_payments(
     
     payments = await db.payments.find(query, {"_id": 0}).to_list(1000)
     
+    if not payments:
+        return []
+    
+    # Batch fetch students
+    student_ids = list(set(p["student_id"] for p in payments))
+    students = await db.students.find({"id": {"$in": student_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(len(student_ids))
+    student_map = {s["id"]: s.get("name") for s in students}
+    
     result = []
     for p in payments:
-        student = await db.students.find_one({"id": p["student_id"]}, {"_id": 0, "name": 1})
-        result.append(PaymentResponse(**p, student_name=student.get("name") if student else None))
+        result.append(PaymentResponse(**p, student_name=student_map.get(p["student_id"])))
     return result
 
 @api_router.put("/payments/{payment_id}", response_model=PaymentResponse)
@@ -702,29 +748,59 @@ async def get_class_report(class_id: str, month: Optional[str] = None, user: dic
     # Get enrollments
     enrollments = await db.enrollments.find({"class_id": class_id, "status": "active"}, {"_id": 0}).to_list(100)
     
+    if not enrollments:
+        return {"class": cls, "enrolled_count": 0, "students": []}
+    
+    # Batch fetch all students
+    student_ids = [e["student_id"] for e in enrollments]
+    enrollment_ids = [e["id"] for e in enrollments]
+    
+    students = await db.students.find({"id": {"$in": student_ids}}, {"_id": 0}).to_list(len(student_ids))
+    student_map = {s["id"]: s for s in students}
+    
+    # Batch fetch attendance for all enrollments
+    attendance_query = {"enrollment_id": {"$in": enrollment_ids}}
+    if month:
+        attendance_query["date"] = {"$regex": f"^{month}"}
+    all_attendance = await db.attendance.find(attendance_query, {"_id": 0, "enrollment_id": 1, "status": 1}).to_list(5000)
+    
+    # Group attendance by enrollment
+    attendance_by_enrollment = {}
+    for a in all_attendance:
+        eid = a["enrollment_id"]
+        if eid not in attendance_by_enrollment:
+            attendance_by_enrollment[eid] = []
+        attendance_by_enrollment[eid].append(a)
+    
+    # Batch fetch payments for all students in this class
+    payment_query = {"student_id": {"$in": student_ids}, "class_id": class_id}
+    if month:
+        payment_query["reference_month"] = month
+    all_payments = await db.payments.find(payment_query, {"_id": 0, "student_id": 1, "amount": 1, "status": 1}).to_list(1000)
+    
+    # Group payments by student
+    payments_by_student = {}
+    for p in all_payments:
+        sid = p["student_id"]
+        if sid not in payments_by_student:
+            payments_by_student[sid] = []
+        payments_by_student[sid].append(p)
+    
     students_data = []
     for e in enrollments:
-        student = await db.students.find_one({"id": e["student_id"]}, {"_id": 0})
+        student = student_map.get(e["student_id"])
         if not student:
             continue
         
-        # Attendance
-        attendance_query = {"enrollment_id": e["id"]}
-        if month:
-            attendance_query["date"] = {"$regex": f"^{month}"}
-        
-        attendance = await db.attendance.find(attendance_query, {"_id": 0}).to_list(100)
+        # Attendance stats
+        attendance = attendance_by_enrollment.get(e["id"], [])
         total_classes = len(attendance)
         present = len([a for a in attendance if a["status"] == "P"])
         absent = len([a for a in attendance if a["status"] == "F"])
         justified = len([a for a in attendance if a["status"] == "FJ"])
         
-        # Payments
-        payment_query = {"student_id": e["student_id"], "class_id": class_id}
-        if month:
-            payment_query["reference_month"] = month
-        
-        payments = await db.payments.find(payment_query, {"_id": 0}).to_list(100)
+        # Payment stats
+        payments = payments_by_student.get(e["student_id"], [])
         total_paid = sum(p["amount"] for p in payments if p["status"] == "paid")
         pending_payments = [p for p in payments if p["status"] == "pending"]
         
