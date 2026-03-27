@@ -221,6 +221,67 @@ class GalleryImage(BaseModel):
     caption: Optional[str] = None
     category: Optional[str] = None
 
+class GalleryImageCreate(BaseModel):
+    url: str
+    caption: Optional[str] = None
+    category: Optional[str] = None
+    order: int = 0
+
+class GalleryImageResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    url: str
+    caption: Optional[str] = None
+    category: Optional[str] = None
+    order: int = 0
+    created_at: str
+
+class SiteSettingsBase(BaseModel):
+    # Hero Section
+    hero_title: str = "Transformando Vidas através da Arte e Cultura"
+    hero_subtitle: str = "Oferecemos aulas de dança, teatro, música e artes para crianças e jovens em situação de vulnerabilidade social."
+    hero_image: Optional[str] = None
+    hero_badge: str = "Transformando vidas desde 2021"
+    
+    # About Section
+    about_title: str = "Levando arte, cultura e esperança para comunidades"
+    about_description: str = "O Projeto Alegria nasceu em 2021 com o propósito de transformar a vida de crianças e jovens em situação de vulnerabilidade social através da arte e da cultura."
+    about_description_2: str = "Acreditamos que a arte tem o poder de desenvolver habilidades, fortalecer a autoestima, promover a inclusão social e abrir portas para um futuro melhor."
+    about_image: Optional[str] = None
+    mission: str = "Promover o desenvolvimento integral de crianças e jovens através do acesso a atividades artísticas e culturais de qualidade."
+    vision: str = "Ser referência em educação artística e cultural, contribuindo para a formação de cidadãos críticos e criativos."
+    years_active: int = 5
+    
+    # Contact Info
+    address: str = "Rua da Alegria, 123 - Centro"
+    city: str = "São Paulo - SP"
+    zipcode: str = "01234-567"
+    phone: str = "(11) 98765-4321"
+    phone_2: Optional[str] = "(11) 3456-7890"
+    email: str = "contato@projetoalegria.org"
+    whatsapp: Optional[str] = None
+    
+    # Hours
+    hours_weekday: str = "Segunda a Sexta: 8h às 18h"
+    hours_weekend: str = "Sábado: 9h às 13h"
+    
+    # Social Media
+    facebook: Optional[str] = None
+    instagram: Optional[str] = None
+    youtube: Optional[str] = None
+    twitter: Optional[str] = None
+    
+    # Footer
+    footer_text: str = "Transformando vidas através da arte e cultura desde 2021."
+
+class SiteSettingsUpdate(SiteSettingsBase):
+    pass
+
+class SiteSettingsResponse(SiteSettingsBase):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    updated_at: str
+
 class TestimonialBase(BaseModel):
     name: str
     role: str
@@ -885,7 +946,10 @@ async def list_public_classes():
 async def get_public_stats():
     total_students = await db.students.count_documents({"status": "active"})
     total_classes = await db.classes.count_documents({"status": "active"})
-    years_active = 5  # Hardcoded as per original
+    
+    # Get years_active from settings
+    settings = await db.site_settings.find_one({}, {"_id": 0, "years_active": 1})
+    years_active = settings.get("years_active", 5) if settings else 5
     
     return {
         "students": total_students if total_students > 0 else 64,
@@ -966,6 +1030,142 @@ async def create_testimonial(testimonial: TestimonialCreate, user: dict = Depend
 async def list_testimonials(user: dict = Depends(get_current_user)):
     testimonials = await db.testimonials.find({}, {"_id": 0}).to_list(100)
     return [TestimonialResponse(**t) for t in testimonials]
+
+@api_router.put("/testimonials/{testimonial_id}", response_model=TestimonialResponse)
+async def update_testimonial(testimonial_id: str, testimonial: TestimonialCreate, user: dict = Depends(require_admin)):
+    existing = await db.testimonials.find_one({"id": testimonial_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Testimonial not found")
+    
+    await db.testimonials.update_one({"id": testimonial_id}, {"$set": testimonial.model_dump()})
+    updated = await db.testimonials.find_one({"id": testimonial_id}, {"_id": 0})
+    return TestimonialResponse(**updated)
+
+@api_router.delete("/testimonials/{testimonial_id}")
+async def delete_testimonial(testimonial_id: str, user: dict = Depends(require_admin)):
+    result = await db.testimonials.delete_one({"id": testimonial_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Testimonial not found")
+    return {"message": "Testimonial deleted"}
+
+# ==================== CMS - SITE SETTINGS ====================
+
+@api_router.get("/settings", response_model=SiteSettingsResponse)
+async def get_site_settings():
+    settings = await db.site_settings.find_one({}, {"_id": 0})
+    if not settings:
+        # Return default settings
+        default = SiteSettingsBase()
+        return SiteSettingsResponse(
+            id="default",
+            updated_at=datetime.now(timezone.utc).isoformat(),
+            **default.model_dump()
+        )
+    return SiteSettingsResponse(**settings)
+
+@api_router.put("/settings", response_model=SiteSettingsResponse)
+async def update_site_settings(settings: SiteSettingsUpdate, user: dict = Depends(require_admin)):
+    existing = await db.site_settings.find_one({})
+    now = datetime.now(timezone.utc).isoformat()
+    
+    if existing:
+        await db.site_settings.update_one(
+            {"id": existing["id"]},
+            {"$set": {**settings.model_dump(), "updated_at": now}}
+        )
+        updated = await db.site_settings.find_one({"id": existing["id"]}, {"_id": 0})
+    else:
+        doc = {
+            "id": str(uuid.uuid4()),
+            **settings.model_dump(),
+            "updated_at": now
+        }
+        await db.site_settings.insert_one(doc)
+        updated = await db.site_settings.find_one({"id": doc["id"]}, {"_id": 0})
+    
+    return SiteSettingsResponse(**updated)
+
+@api_router.get("/public/settings")
+async def get_public_settings():
+    settings = await db.site_settings.find_one({}, {"_id": 0})
+    if not settings:
+        default = SiteSettingsBase()
+        return default.model_dump()
+    # Remove id and updated_at for public
+    return {k: v for k, v in settings.items() if k not in ["id", "updated_at"]}
+
+# ==================== CMS - GALLERY ====================
+
+@api_router.post("/gallery", response_model=GalleryImageResponse)
+async def create_gallery_image(image: GalleryImageCreate, user: dict = Depends(require_admin)):
+    image_id = str(uuid.uuid4())
+    doc = {
+        "id": image_id,
+        **image.model_dump(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.gallery.insert_one(doc)
+    return GalleryImageResponse(**doc)
+
+@api_router.get("/gallery", response_model=List[GalleryImageResponse])
+async def list_gallery_images(category: Optional[str] = None):
+    query = {}
+    if category:
+        query["category"] = category
+    images = await db.gallery.find(query, {"_id": 0}).sort("order", 1).to_list(200)
+    return [GalleryImageResponse(**img) for img in images]
+
+@api_router.put("/gallery/{image_id}", response_model=GalleryImageResponse)
+async def update_gallery_image(image_id: str, image: GalleryImageCreate, user: dict = Depends(require_admin)):
+    existing = await db.gallery.find_one({"id": image_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    await db.gallery.update_one({"id": image_id}, {"$set": image.model_dump()})
+    updated = await db.gallery.find_one({"id": image_id}, {"_id": 0})
+    return GalleryImageResponse(**updated)
+
+@api_router.delete("/gallery/{image_id}")
+async def delete_gallery_image(image_id: str, user: dict = Depends(require_admin)):
+    result = await db.gallery.delete_one({"id": image_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return {"message": "Image deleted"}
+
+@api_router.get("/public/gallery", response_model=List[GalleryImageResponse])
+async def list_public_gallery(category: Optional[str] = None):
+    query = {}
+    if category:
+        query["category"] = category
+    images = await db.gallery.find(query, {"_id": 0}).sort("order", 1).to_list(200)
+    return [GalleryImageResponse(**img) for img in images]
+
+# ==================== CMS - CONTACT MESSAGES ====================
+
+@api_router.get("/messages")
+async def list_contact_messages(status: Optional[str] = None, user: dict = Depends(require_admin)):
+    query = {}
+    if status:
+        query["status"] = status
+    messages = await db.contact_messages.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return messages
+
+@api_router.put("/messages/{message_id}/status")
+async def update_message_status(message_id: str, status: str, user: dict = Depends(require_admin)):
+    result = await db.contact_messages.update_one(
+        {"id": message_id},
+        {"$set": {"status": status}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"message": "Status updated"}
+
+@api_router.delete("/messages/{message_id}")
+async def delete_message(message_id: str, user: dict = Depends(require_admin)):
+    result = await db.contact_messages.delete_one({"id": message_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"message": "Message deleted"}
 
 # ==================== ROOT ROUTE ====================
 

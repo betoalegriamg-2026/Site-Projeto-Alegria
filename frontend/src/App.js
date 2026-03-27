@@ -833,6 +833,11 @@ const DashboardLayout = ({ children }) => {
     { path: "/painel/pagamentos", icon: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z", label: "Pagamentos" },
     { path: "/painel/caixa", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", label: "Fluxo de Caixa" },
     { path: "/painel/relatorios", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z", label: "Relatorios" },
+    { path: "/painel/site", icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z", label: "Editar Site", section: "cms" },
+    { path: "/painel/galeria", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z", label: "Galeria", section: "cms" },
+    { path: "/painel/projetos", icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10", label: "Projetos", section: "cms" },
+    { path: "/painel/depoimentos", icon: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z", label: "Depoimentos", section: "cms" },
+    { path: "/painel/mensagens", icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z", label: "Mensagens", section: "cms" },
   ];
 
   const handleLogout = () => {
@@ -858,12 +863,27 @@ const DashboardLayout = ({ children }) => {
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          {menuItems.map(item => (
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {menuItems.filter(i => !i.section).map(item => (
             <Link
               key={item.path}
               to={item.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${window.location.pathname === item.path ? "bg-primary text-white" : "hover:bg-gray-100 text-gray-700"}`}
+              data-testid={`nav-${item.label.toLowerCase()}`}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} /></svg>
+              {sidebarOpen && <span>{item.label}</span>}
+            </Link>
+          ))}
+          
+          {sidebarOpen && <div className="pt-4 pb-2 px-4 text-xs font-semibold text-gray-400 uppercase">Gerenciar Site</div>}
+          {!sidebarOpen && <div className="border-t border-gray-200 my-2"></div>}
+          
+          {menuItems.filter(i => i.section === "cms").map(item => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${window.location.pathname === item.path ? "bg-secondary text-secondary-dark" : "hover:bg-gray-100 text-gray-700"}`}
               data-testid={`nav-${item.label.toLowerCase()}`}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} /></svg>
@@ -1502,6 +1522,703 @@ const ReportsPage = () => {
   );
 };
 
+// ==================== CMS PAGES ====================
+
+// Site Settings Page
+const SiteSettingsPage = () => {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("hero");
+
+  useEffect(() => {
+    axios.get(`${API}/settings`).then(res => {
+      setSettings(res.data);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await axios.put(`${API}/settings`, settings);
+      setSettings(res.data);
+      alert("Configuracoes salvas com sucesso!");
+    } catch (e) {
+      alert("Erro ao salvar configuracoes");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-64">Carregando...</div>;
+
+  const tabs = [
+    { id: "hero", label: "Hero/Banner" },
+    { id: "about", label: "Sobre" },
+    { id: "contact", label: "Contato" },
+    { id: "social", label: "Redes Sociais" },
+  ];
+
+  return (
+    <div className="space-y-6" data-testid="site-settings-page">
+      <div className="flex items-center justify-between">
+        <h2 className="font-heading text-2xl font-bold text-primary-dark">Editar Site</h2>
+        <button onClick={handleSave} disabled={saving} className="btn-primary" data-testid="save-settings-btn">
+          {saving ? "Salvando..." : "Salvar Alteracoes"}
+        </button>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="flex border-b">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-6 py-4 font-medium transition-colors ${activeTab === tab.id ? "bg-primary text-white" : "hover:bg-gray-50"}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-6">
+          {activeTab === "hero" && settings && (
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">Titulo Principal</label>
+                <input type="text" className="input-field" value={settings.hero_title || ""} onChange={(e) => setSettings({ ...settings, hero_title: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Subtitulo</label>
+                <textarea rows={3} className="input-field resize-none" value={settings.hero_subtitle || ""} onChange={(e) => setSettings({ ...settings, hero_subtitle: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Badge/Destaque</label>
+                <input type="text" className="input-field" value={settings.hero_badge || ""} onChange={(e) => setSettings({ ...settings, hero_badge: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">URL da Imagem do Hero</label>
+                <input type="url" className="input-field" placeholder="https://..." value={settings.hero_image || ""} onChange={(e) => setSettings({ ...settings, hero_image: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Anos de Atividade</label>
+                <input type="number" className="input-field w-32" value={settings.years_active || 5} onChange={(e) => setSettings({ ...settings, years_active: parseInt(e.target.value) || 5 })} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === "about" && settings && (
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">Titulo da Secao Sobre</label>
+                <input type="text" className="input-field" value={settings.about_title || ""} onChange={(e) => setSettings({ ...settings, about_title: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Descricao Principal</label>
+                <textarea rows={4} className="input-field resize-none" value={settings.about_description || ""} onChange={(e) => setSettings({ ...settings, about_description: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Descricao Secundaria</label>
+                <textarea rows={4} className="input-field resize-none" value={settings.about_description_2 || ""} onChange={(e) => setSettings({ ...settings, about_description_2: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">URL da Imagem Sobre</label>
+                <input type="url" className="input-field" placeholder="https://..." value={settings.about_image || ""} onChange={(e) => setSettings({ ...settings, about_image: e.target.value })} />
+              </div>
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Missao</label>
+                  <textarea rows={3} className="input-field resize-none" value={settings.mission || ""} onChange={(e) => setSettings({ ...settings, mission: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Visao</label>
+                  <textarea rows={3} className="input-field resize-none" value={settings.vision || ""} onChange={(e) => setSettings({ ...settings, vision: e.target.value })} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "contact" && settings && (
+            <div className="space-y-6">
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Endereco</label>
+                  <input type="text" className="input-field" value={settings.address || ""} onChange={(e) => setSettings({ ...settings, address: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Cidade/Estado</label>
+                  <input type="text" className="input-field" value={settings.city || ""} onChange={(e) => setSettings({ ...settings, city: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">CEP</label>
+                  <input type="text" className="input-field" value={settings.zipcode || ""} onChange={(e) => setSettings({ ...settings, zipcode: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Email</label>
+                  <input type="email" className="input-field" value={settings.email || ""} onChange={(e) => setSettings({ ...settings, email: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Telefone Principal</label>
+                  <input type="tel" className="input-field" value={settings.phone || ""} onChange={(e) => setSettings({ ...settings, phone: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Telefone Secundario</label>
+                  <input type="tel" className="input-field" value={settings.phone_2 || ""} onChange={(e) => setSettings({ ...settings, phone_2: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">WhatsApp</label>
+                  <input type="tel" className="input-field" value={settings.whatsapp || ""} onChange={(e) => setSettings({ ...settings, whatsapp: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Horario (Dias Uteis)</label>
+                  <input type="text" className="input-field" value={settings.hours_weekday || ""} onChange={(e) => setSettings({ ...settings, hours_weekday: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Horario (Fim de Semana)</label>
+                  <input type="text" className="input-field" value={settings.hours_weekend || ""} onChange={(e) => setSettings({ ...settings, hours_weekend: e.target.value })} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "social" && settings && (
+            <div className="space-y-6">
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Facebook</label>
+                  <input type="url" className="input-field" placeholder="https://facebook.com/..." value={settings.facebook || ""} onChange={(e) => setSettings({ ...settings, facebook: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Instagram</label>
+                  <input type="url" className="input-field" placeholder="https://instagram.com/..." value={settings.instagram || ""} onChange={(e) => setSettings({ ...settings, instagram: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">YouTube</label>
+                  <input type="url" className="input-field" placeholder="https://youtube.com/..." value={settings.youtube || ""} onChange={(e) => setSettings({ ...settings, youtube: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Twitter/X</label>
+                  <input type="url" className="input-field" placeholder="https://twitter.com/..." value={settings.twitter || ""} onChange={(e) => setSettings({ ...settings, twitter: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Texto do Rodape</label>
+                <textarea rows={2} className="input-field resize-none" value={settings.footer_text || ""} onChange={(e) => setSettings({ ...settings, footer_text: e.target.value })} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Gallery Page
+const GalleryPage = () => {
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ url: "", caption: "", category: "", order: 0 });
+
+  useEffect(() => {
+    fetchImages();
+  }, []);
+
+  const fetchImages = async () => {
+    try {
+      const res = await axios.get(`${API}/gallery`);
+      setImages(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/gallery`, form);
+      fetchImages();
+      setShowModal(false);
+      setForm({ url: "", caption: "", category: "", order: 0 });
+    } catch (e) {
+      alert("Erro ao adicionar imagem");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Deseja excluir esta imagem?")) {
+      try {
+        await axios.delete(`${API}/gallery/${id}`);
+        fetchImages();
+      } catch (e) {
+        alert("Erro ao excluir imagem");
+      }
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-64">Carregando...</div>;
+
+  return (
+    <div className="space-y-6" data-testid="gallery-page">
+      <div className="flex items-center justify-between">
+        <h2 className="font-heading text-2xl font-bold text-primary-dark">Galeria de Fotos</h2>
+        <button onClick={() => setShowModal(true)} className="btn-primary" data-testid="add-image-btn">+ Nova Imagem</button>
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {images.map(img => (
+          <div key={img.id} className="bg-white rounded-2xl shadow-sm overflow-hidden group">
+            <div className="relative h-48">
+              <img src={img.url} alt={img.caption || "Galeria"} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <button onClick={() => handleDelete(img.id)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-600 truncate">{img.caption || "Sem legenda"}</p>
+              {img.category && <span className="text-xs bg-blue-100 text-primary px-2 py-1 rounded-full">{img.category}</span>}
+            </div>
+          </div>
+        ))}
+        {images.length === 0 && (
+          <div className="col-span-4 text-center py-12 text-gray-500">Nenhuma imagem na galeria</div>
+        )}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-6 border-b">
+              <h3 className="font-heading text-xl font-bold">Nova Imagem</h3>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">URL da Imagem *</label>
+                <input type="url" required className="input-field" placeholder="https://..." value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Legenda</label>
+                <input type="text" className="input-field" value={form.caption} onChange={(e) => setForm({ ...form, caption: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Categoria</label>
+                <input type="text" className="input-field" placeholder="Ex: Eventos, Turmas, Apresentacoes" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Ordem</label>
+                <input type="number" className="input-field w-24" value={form.order} onChange={(e) => setForm({ ...form, order: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-outline flex-1">Cancelar</button>
+                <button type="submit" className="btn-primary flex-1">Adicionar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Projects Page
+const ProjectsPage = () => {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [form, setForm] = useState({ title: "", description: "", image_url: "", date: "", status: "active" });
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    try {
+      const res = await axios.get(`${API}/projects`);
+      setProjects(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingProject) {
+        await axios.put(`${API}/projects/${editingProject.id}`, form);
+      } else {
+        await axios.post(`${API}/projects`, form);
+      }
+      fetchProjects();
+      setShowModal(false);
+      setEditingProject(null);
+      setForm({ title: "", description: "", image_url: "", date: "", status: "active" });
+    } catch (e) {
+      alert("Erro ao salvar projeto");
+    }
+  };
+
+  const handleEdit = (project) => {
+    setEditingProject(project);
+    setForm(project);
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Deseja excluir este projeto?")) {
+      try {
+        await axios.delete(`${API}/projects/${id}`);
+        fetchProjects();
+      } catch (e) {
+        alert("Erro ao excluir projeto");
+      }
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-64">Carregando...</div>;
+
+  return (
+    <div className="space-y-6" data-testid="projects-page">
+      <div className="flex items-center justify-between">
+        <h2 className="font-heading text-2xl font-bold text-primary-dark">Projetos</h2>
+        <button onClick={() => { setEditingProject(null); setForm({ title: "", description: "", image_url: "", date: "", status: "active" }); setShowModal(true); }} className="btn-primary" data-testid="add-project-btn">+ Novo Projeto</button>
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {projects.map(project => (
+          <div key={project.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            {project.image_url && (
+              <img src={project.image_url} alt={project.title} className="w-full h-48 object-cover" />
+            )}
+            <div className="p-6">
+              <div className="flex items-start justify-between mb-2">
+                <h3 className="font-bold text-lg text-primary-dark">{project.title}</h3>
+                <span className={`px-2 py-1 rounded-full text-xs ${project.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}`}>
+                  {project.status === "active" ? "Ativo" : "Inativo"}
+                </span>
+              </div>
+              <p className="text-gray-600 text-sm mb-4 line-clamp-2">{project.description}</p>
+              {project.date && <p className="text-xs text-gray-400 mb-4">{project.date}</p>}
+              <div className="flex gap-2">
+                <button onClick={() => handleEdit(project)} className="text-primary hover:underline text-sm">Editar</button>
+                <button onClick={() => handleDelete(project.id)} className="text-red-600 hover:underline text-sm">Excluir</button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {projects.length === 0 && (
+          <div className="col-span-3 text-center py-12 text-gray-500">Nenhum projeto cadastrado</div>
+        )}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-6 border-b">
+              <h3 className="font-heading text-xl font-bold">{editingProject ? "Editar Projeto" : "Novo Projeto"}</h3>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Titulo *</label>
+                <input type="text" required className="input-field" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Descricao *</label>
+                <textarea rows={3} required className="input-field resize-none" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">URL da Imagem</label>
+                <input type="url" className="input-field" placeholder="https://..." value={form.image_url || ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Data</label>
+                  <input type="text" className="input-field" placeholder="Ex: Dezembro 2023" value={form.date || ""} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Status</label>
+                  <select className="input-field" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                    <option value="active">Ativo</option>
+                    <option value="inactive">Inativo</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-outline flex-1">Cancelar</button>
+                <button type="submit" className="btn-primary flex-1">Salvar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Testimonials Page
+const TestimonialsPage = () => {
+  const [testimonials, setTestimonials] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingTestimonial, setEditingTestimonial] = useState(null);
+  const [form, setForm] = useState({ name: "", role: "", content: "", avatar_url: "", status: "active" });
+
+  useEffect(() => {
+    fetchTestimonials();
+  }, []);
+
+  const fetchTestimonials = async () => {
+    try {
+      const res = await axios.get(`${API}/testimonials`);
+      setTestimonials(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingTestimonial) {
+        await axios.put(`${API}/testimonials/${editingTestimonial.id}`, form);
+      } else {
+        await axios.post(`${API}/testimonials`, form);
+      }
+      fetchTestimonials();
+      setShowModal(false);
+      setEditingTestimonial(null);
+      setForm({ name: "", role: "", content: "", avatar_url: "", status: "active" });
+    } catch (e) {
+      alert("Erro ao salvar depoimento");
+    }
+  };
+
+  const handleEdit = (t) => {
+    setEditingTestimonial(t);
+    setForm(t);
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Deseja excluir este depoimento?")) {
+      try {
+        await axios.delete(`${API}/testimonials/${id}`);
+        fetchTestimonials();
+      } catch (e) {
+        alert("Erro ao excluir depoimento");
+      }
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-64">Carregando...</div>;
+
+  return (
+    <div className="space-y-6" data-testid="testimonials-page">
+      <div className="flex items-center justify-between">
+        <h2 className="font-heading text-2xl font-bold text-primary-dark">Depoimentos</h2>
+        <button onClick={() => { setEditingTestimonial(null); setForm({ name: "", role: "", content: "", avatar_url: "", status: "active" }); setShowModal(true); }} className="btn-primary" data-testid="add-testimonial-btn">+ Novo Depoimento</button>
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {testimonials.map(t => (
+          <div key={t.id} className="bg-white rounded-2xl shadow-sm p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                <span className="text-primary font-bold">{t.name.charAt(0)}</span>
+              </div>
+              <div>
+                <p className="font-semibold">{t.name}</p>
+                <p className="text-sm text-gray-500">{t.role}</p>
+              </div>
+            </div>
+            <p className="text-gray-600 text-sm mb-4">"{t.content}"</p>
+            <div className="flex items-center justify-between">
+              <span className={`px-2 py-1 rounded-full text-xs ${t.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}`}>
+                {t.status === "active" ? "Ativo" : "Inativo"}
+              </span>
+              <div className="flex gap-2">
+                <button onClick={() => handleEdit(t)} className="text-primary hover:underline text-sm">Editar</button>
+                <button onClick={() => handleDelete(t.id)} className="text-red-600 hover:underline text-sm">Excluir</button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {testimonials.length === 0 && (
+          <div className="col-span-3 text-center py-12 text-gray-500">Nenhum depoimento cadastrado</div>
+        )}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-6 border-b">
+              <h3 className="font-heading text-xl font-bold">{editingTestimonial ? "Editar Depoimento" : "Novo Depoimento"}</h3>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Nome *</label>
+                <input type="text" required className="input-field" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Funcao/Papel *</label>
+                <input type="text" required className="input-field" placeholder="Ex: Mae de aluno, Voluntario" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Depoimento *</label>
+                <textarea rows={4} required className="input-field resize-none" value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Status</label>
+                <select className="input-field" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                  <option value="active">Ativo</option>
+                  <option value="inactive">Inativo</option>
+                </select>
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-outline flex-1">Cancelar</button>
+                <button type="submit" className="btn-primary flex-1">Salvar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Messages Page
+const MessagesPage = () => {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
+
+  const fetchMessages = async () => {
+    try {
+      const res = await axios.get(`${API}/messages`);
+      setMessages(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStatus = async (id, status) => {
+    try {
+      await axios.put(`${API}/messages/${id}/status?status=${status}`);
+      fetchMessages();
+    } catch (e) {
+      alert("Erro ao atualizar status");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Deseja excluir esta mensagem?")) {
+      try {
+        await axios.delete(`${API}/messages/${id}`);
+        fetchMessages();
+        setSelectedMessage(null);
+      } catch (e) {
+        alert("Erro ao excluir mensagem");
+      }
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-64">Carregando...</div>;
+
+  return (
+    <div className="space-y-6" data-testid="messages-page">
+      <h2 className="font-heading text-2xl font-bold text-primary-dark">Mensagens de Contato</h2>
+
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b">
+            <p className="font-medium">{messages.length} mensagens</p>
+          </div>
+          <div className="divide-y max-h-[600px] overflow-y-auto">
+            {messages.map(m => (
+              <div
+                key={m.id}
+                onClick={() => setSelectedMessage(m)}
+                className={`p-4 cursor-pointer hover:bg-gray-50 transition ${selectedMessage?.id === m.id ? "bg-blue-50" : ""}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <p className="font-medium truncate">{m.name}</p>
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${m.status === "new" ? "bg-blue-100 text-blue-700" : m.status === "read" ? "bg-gray-100 text-gray-700" : "bg-green-100 text-green-700"}`}>
+                    {m.status === "new" ? "Nova" : m.status === "read" ? "Lida" : "Respondida"}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 truncate">{m.subject}</p>
+                <p className="text-xs text-gray-400 mt-1">{new Date(m.created_at).toLocaleDateString()}</p>
+              </div>
+            ))}
+            {messages.length === 0 && (
+              <div className="p-8 text-center text-gray-500">Nenhuma mensagem</div>
+            )}
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm">
+          {selectedMessage ? (
+            <div className="p-6">
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <h3 className="font-bold text-lg">{selectedMessage.subject}</h3>
+                  <p className="text-gray-600">{selectedMessage.name} - {selectedMessage.email}</p>
+                  {selectedMessage.phone && <p className="text-gray-500 text-sm">{selectedMessage.phone}</p>}
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedMessage.status}
+                    onChange={(e) => updateStatus(selectedMessage.id, e.target.value)}
+                    className="input-field text-sm py-2"
+                  >
+                    <option value="new">Nova</option>
+                    <option value="read">Lida</option>
+                    <option value="replied">Respondida</option>
+                  </select>
+                  <button onClick={() => handleDelete(selectedMessage.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                </div>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-6">
+                <p className="whitespace-pre-wrap">{selectedMessage.message}</p>
+              </div>
+              <p className="text-xs text-gray-400 mt-4">Recebida em {new Date(selectedMessage.created_at).toLocaleString()}</p>
+            </div>
+          ) : (
+            <div className="p-12 text-center text-gray-500">
+              Selecione uma mensagem para visualizar
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Main App
 function App() {
   return (
@@ -1518,6 +2235,11 @@ function App() {
           <Route path="/painel/pagamentos" element={<ProtectedRoute><DashboardLayout><PaymentsPage /></DashboardLayout></ProtectedRoute>} />
           <Route path="/painel/caixa" element={<ProtectedRoute><DashboardLayout><CashFlowPage /></DashboardLayout></ProtectedRoute>} />
           <Route path="/painel/relatorios" element={<ProtectedRoute><DashboardLayout><ReportsPage /></DashboardLayout></ProtectedRoute>} />
+          <Route path="/painel/site" element={<ProtectedRoute adminOnly><DashboardLayout><SiteSettingsPage /></DashboardLayout></ProtectedRoute>} />
+          <Route path="/painel/galeria" element={<ProtectedRoute adminOnly><DashboardLayout><GalleryPage /></DashboardLayout></ProtectedRoute>} />
+          <Route path="/painel/projetos" element={<ProtectedRoute adminOnly><DashboardLayout><ProjectsPage /></DashboardLayout></ProtectedRoute>} />
+          <Route path="/painel/depoimentos" element={<ProtectedRoute adminOnly><DashboardLayout><TestimonialsPage /></DashboardLayout></ProtectedRoute>} />
+          <Route path="/painel/mensagens" element={<ProtectedRoute adminOnly><DashboardLayout><MessagesPage /></DashboardLayout></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

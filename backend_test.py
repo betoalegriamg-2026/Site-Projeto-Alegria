@@ -1,364 +1,296 @@
+#!/usr/bin/env python3
+
 import requests
 import sys
 import json
 from datetime import datetime
 
-class ProjetoAlegraAPITester:
+class ProjetoAlegriaAPITester:
     def __init__(self, base_url="https://last-checkpoint-5.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.token = None
         self.tests_run = 0
         self.tests_passed = 0
-        self.admin_user = None
-        self.test_student_id = None
-        self.test_class_id = None
-        self.test_enrollment_id = None
+        self.failed_tests = []
+        self.admin_credentials = {
+            "email": "admin@projetoalegria.org",
+            "password": "admin123"
+        }
 
-    def run_test(self, name, method, endpoint, expected_status, data=None, headers=None):
-        """Run a single API test"""
-        url = f"{self.api_url}/{endpoint}"
-        test_headers = {'Content-Type': 'application/json'}
-        
-        if self.token:
-            test_headers['Authorization'] = f'Bearer {self.token}'
-        
-        if headers:
-            test_headers.update(headers)
-
+    def log_test(self, name, success, details=""):
+        """Log test result"""
         self.tests_run += 1
-        print(f"\n🔍 Testing {name}...")
-        print(f"   URL: {url}")
+        if success:
+            self.tests_passed += 1
+            print(f"✅ {name}")
+        else:
+            print(f"❌ {name} - {details}")
+            self.failed_tests.append({"test": name, "details": details})
+
+    def make_request(self, method, endpoint, data=None, expected_status=200, auth_required=True):
+        """Make HTTP request with proper headers"""
+        url = f"{self.api_url}/{endpoint}"
+        headers = {'Content-Type': 'application/json'}
         
+        if auth_required and self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
+
         try:
             if method == 'GET':
-                response = requests.get(url, headers=test_headers, timeout=10)
+                response = requests.get(url, headers=headers, timeout=10)
             elif method == 'POST':
-                response = requests.post(url, json=data, headers=test_headers, timeout=10)
+                response = requests.post(url, json=data, headers=headers, timeout=10)
             elif method == 'PUT':
-                response = requests.put(url, json=data, headers=test_headers, timeout=10)
+                response = requests.put(url, json=data, headers=headers, timeout=10)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=test_headers, timeout=10)
+                response = requests.delete(url, headers=headers, timeout=10)
+            else:
+                return False, {"error": f"Unsupported method: {method}"}
 
             success = response.status_code == expected_status
-            if success:
-                self.tests_passed += 1
-                print(f"✅ Passed - Status: {response.status_code}")
-                try:
-                    return success, response.json() if response.content else {}
-                except:
-                    return success, {}
-            else:
-                print(f"❌ Failed - Expected {expected_status}, got {response.status_code}")
-                try:
-                    error_data = response.json() if response.content else {}
-                    print(f"   Error: {error_data}")
-                except:
-                    print(f"   Response: {response.text[:200]}")
-                return False, {}
+            try:
+                response_data = response.json() if response.content else {}
+            except:
+                response_data = {"raw_response": response.text}
 
-        except Exception as e:
-            print(f"❌ Failed - Error: {str(e)}")
-            return False, {}
+            return success, response_data
 
-    def test_root_endpoint(self):
-        """Test root API endpoint"""
-        return self.run_test("Root API", "GET", "", 200)
+        except requests.exceptions.RequestException as e:
+            return False, {"error": str(e)}
 
     def test_admin_login(self):
-        """Test admin login"""
-        success, response = self.run_test(
-            "Admin Login",
-            "POST",
-            "auth/login",
-            200,
-            data={"email": "admin@projetoalegria.org", "password": "admin123"}
+        """Test admin login and get token"""
+        print("\n🔐 Testing Admin Authentication...")
+        
+        success, response = self.make_request(
+            'POST', 'auth/login', 
+            self.admin_credentials, 
+            expected_status=200, 
+            auth_required=False
         )
+        
         if success and 'access_token' in response:
             self.token = response['access_token']
-            self.admin_user = response.get('user')
-            print(f"   Token obtained for user: {self.admin_user.get('name', 'Unknown')}")
+            self.log_test("Admin Login", True)
             return True
-        return False
+        else:
+            self.log_test("Admin Login", False, f"Response: {response}")
+            return False
 
-    def test_auth_me(self):
-        """Test getting current user info"""
-        return self.run_test("Get Current User", "GET", "auth/me", 200)
+    def test_site_settings(self):
+        """Test site settings endpoints"""
+        print("\n⚙️ Testing Site Settings...")
+        
+        # Test GET /api/settings (should return default settings)
+        success, response = self.make_request('GET', 'settings', expected_status=200)
+        self.log_test("GET /api/settings", success, "" if success else str(response))
+        
+        if success:
+            # Test PUT /api/settings (requires admin auth)
+            update_data = {
+                "hero_title": "Test Updated Title",
+                "hero_subtitle": "Test Updated Subtitle",
+                "about_title": "Test About Title",
+                "phone": "(11) 99999-9999",
+                "email": "test@projetoalegria.org"
+            }
+            
+            success, response = self.make_request('PUT', 'settings', update_data, expected_status=200)
+            self.log_test("PUT /api/settings (admin auth)", success, "" if success else str(response))
+        
+        # Test GET /api/public/settings (no auth required)
+        success, response = self.make_request('GET', 'public/settings', expected_status=200, auth_required=False)
+        self.log_test("GET /api/public/settings (no auth)", success, "" if success else str(response))
 
-    def test_public_stats(self):
-        """Test public stats endpoint"""
-        return self.run_test("Public Stats", "GET", "public/stats", 200)
+    def test_gallery_management(self):
+        """Test gallery endpoints"""
+        print("\n🖼️ Testing Gallery Management...")
+        
+        # Test POST /api/gallery (requires admin)
+        gallery_data = {
+            "url": "https://example.com/test-image.jpg",
+            "caption": "Test Image Caption",
+            "category": "test",
+            "order": 1
+        }
+        
+        success, response = self.make_request('POST', 'gallery', gallery_data, expected_status=200)
+        self.log_test("POST /api/gallery (admin)", success, "" if success else str(response))
+        
+        gallery_id = None
+        if success and 'id' in response:
+            gallery_id = response['id']
+        
+        # Test GET /api/gallery (list all images)
+        success, response = self.make_request('GET', 'gallery', expected_status=200, auth_required=False)
+        self.log_test("GET /api/gallery", success, "" if success else str(response))
+        
+        # Test DELETE /api/gallery/:id (requires admin)
+        if gallery_id:
+            success, response = self.make_request('DELETE', f'gallery/{gallery_id}', expected_status=200)
+            self.log_test("DELETE /api/gallery/:id (admin)", success, "" if success else str(response))
 
-    def test_public_classes(self):
-        """Test public classes endpoint"""
-        return self.run_test("Public Classes", "GET", "public/classes", 200)
+    def test_projects_crud(self):
+        """Test projects CRUD operations"""
+        print("\n📋 Testing Projects CRUD...")
+        
+        # Test POST /api/projects (create)
+        project_data = {
+            "title": "Test Project",
+            "description": "This is a test project description",
+            "image_url": "https://example.com/project.jpg",
+            "date": "2024-01-15",
+            "status": "active"
+        }
+        
+        success, response = self.make_request('POST', 'projects', project_data, expected_status=200)
+        self.log_test("POST /api/projects (create)", success, "" if success else str(response))
+        
+        project_id = None
+        if success and 'id' in response:
+            project_id = response['id']
+        
+        # Test GET /api/projects (read all)
+        success, response = self.make_request('GET', 'projects', expected_status=200)
+        self.log_test("GET /api/projects (read)", success, "" if success else str(response))
+        
+        # Test PUT /api/projects/:id (update)
+        if project_id:
+            update_data = {
+                "title": "Updated Test Project",
+                "description": "Updated description",
+                "status": "active"
+            }
+            success, response = self.make_request('PUT', f'projects/{project_id}', update_data, expected_status=200)
+            self.log_test("PUT /api/projects/:id (update)", success, "" if success else str(response))
+            
+            # Test DELETE /api/projects/:id (delete)
+            success, response = self.make_request('DELETE', f'projects/{project_id}', expected_status=200)
+            self.log_test("DELETE /api/projects/:id (delete)", success, "" if success else str(response))
 
-    def test_public_testimonials(self):
-        """Test public testimonials endpoint"""
-        return self.run_test("Public Testimonials", "GET", "public/testimonials", 200)
-
-    def test_contact_submission(self):
-        """Test contact form submission"""
-        contact_data = {
+    def test_testimonials_crud(self):
+        """Test testimonials CRUD operations"""
+        print("\n💬 Testing Testimonials CRUD...")
+        
+        # Test POST /api/testimonials (create)
+        testimonial_data = {
             "name": "Test User",
+            "role": "Test Role",
+            "content": "This is a test testimonial content",
+            "avatar_url": "https://example.com/avatar.jpg",
+            "status": "active"
+        }
+        
+        success, response = self.make_request('POST', 'testimonials', testimonial_data, expected_status=200)
+        self.log_test("POST /api/testimonials (create)", success, "" if success else str(response))
+        
+        testimonial_id = None
+        if success and 'id' in response:
+            testimonial_id = response['id']
+        
+        # Test GET /api/testimonials (read all)
+        success, response = self.make_request('GET', 'testimonials', expected_status=200)
+        self.log_test("GET /api/testimonials (read)", success, "" if success else str(response))
+        
+        # Test PUT /api/testimonials/:id (update)
+        if testimonial_id:
+            update_data = {
+                "name": "Updated Test User",
+                "role": "Updated Role",
+                "content": "Updated testimonial content",
+                "status": "active"
+            }
+            success, response = self.make_request('PUT', f'testimonials/{testimonial_id}', update_data, expected_status=200)
+            self.log_test("PUT /api/testimonials/:id (update)", success, "" if success else str(response))
+            
+            # Test DELETE /api/testimonials/:id (delete)
+            success, response = self.make_request('DELETE', f'testimonials/{testimonial_id}', expected_status=200)
+            self.log_test("DELETE /api/testimonials/:id (delete)", success, "" if success else str(response))
+
+    def test_contact_messages(self):
+        """Test contact messages management"""
+        print("\n📧 Testing Contact Messages...")
+        
+        # First create a contact message via public endpoint
+        contact_data = {
+            "name": "Test Contact",
             "email": "test@example.com",
-            "phone": "11999999999",
-            "subject": "Test Message",
-            "message": "This is a test message from automated testing."
+            "phone": "(11) 99999-9999",
+            "subject": "Test Subject",
+            "message": "This is a test contact message"
         }
-        return self.run_test("Contact Submission", "POST", "public/contact", 200, data=contact_data)
-
-    def test_dashboard_stats(self):
-        """Test dashboard stats (requires auth)"""
-        return self.run_test("Dashboard Stats", "GET", "dashboard/stats", 200)
-
-    def test_create_student(self):
-        """Test creating a student"""
-        student_data = {
-            "name": "João Silva Test",
-            "birth_date": "2010-05-15",
-            "cpf": "12345678901",
-            "mother_name": "Maria Silva",
-            "father_name": "José Silva",
-            "phone": "11987654321",
-            "whatsapp": "11987654321",
-            "email": "joao.test@email.com",
-            "address": "Rua Test, 123",
-            "city": "São Paulo",
-            "state": "SP",
-            "status": "active"
-        }
-        success, response = self.run_test("Create Student", "POST", "students", 200, data=student_data)
-        if success and 'id' in response:
-            self.test_student_id = response['id']
-            print(f"   Created student with ID: {self.test_student_id}")
-            return True
-        return False
-
-    def test_list_students(self):
-        """Test listing students"""
-        return self.run_test("List Students", "GET", "students", 200)
-
-    def test_get_student(self):
-        """Test getting specific student"""
-        if not self.test_student_id:
-            print("❌ No test student ID available")
-            return False
-        return self.run_test("Get Student", "GET", f"students/{self.test_student_id}", 200)
-
-    def test_update_student(self):
-        """Test updating student"""
-        if not self.test_student_id:
-            print("❌ No test student ID available")
-            return False
         
-        update_data = {
-            "name": "João Silva Test Updated",
-            "birth_date": "2010-05-15",
-            "cpf": "12345678901",
-            "mother_name": "Maria Silva",
-            "father_name": "José Silva",
-            "phone": "11987654321",
-            "whatsapp": "11987654321",
-            "email": "joao.updated@email.com",
-            "address": "Rua Test Updated, 456",
-            "city": "São Paulo",
-            "state": "SP",
-            "status": "active"
-        }
-        return self.run_test("Update Student", "PUT", f"students/{self.test_student_id}", 200, data=update_data)
-
-    def test_list_classes(self):
-        """Test listing classes"""
-        success, response = self.run_test("List Classes", "GET", "classes", 200)
+        success, response = self.make_request('POST', 'public/contact', contact_data, expected_status=200, auth_required=False)
+        self.log_test("POST /api/public/contact (create message)", success, "" if success else str(response))
+        
+        # Test GET /api/messages (admin only)
+        success, response = self.make_request('GET', 'messages', expected_status=200)
+        self.log_test("GET /api/messages (admin only)", success, "" if success else str(response))
+        
+        # Test PUT /api/messages/:id/status (update message status)
         if success and response and len(response) > 0:
-            self.test_class_id = response[0]['id']
-            print(f"   Found class with ID: {self.test_class_id}")
-            return True
-        return success
+            message_id = response[0].get('id')
+            if message_id:
+                success, response = self.make_request('PUT', f'messages/{message_id}/status?status=read', expected_status=200)
+                self.log_test("PUT /api/messages/:id/status", success, "" if success else str(response))
 
-    def test_get_class(self):
-        """Test getting specific class"""
-        if not self.test_class_id:
-            print("❌ No test class ID available")
-            return False
-        return self.run_test("Get Class", "GET", f"classes/{self.test_class_id}", 200)
+    def test_public_endpoints(self):
+        """Test public endpoints that don't require authentication"""
+        print("\n🌐 Testing Public Endpoints...")
+        
+        # Test public classes
+        success, response = self.make_request('GET', 'public/classes', expected_status=200, auth_required=False)
+        self.log_test("GET /api/public/classes", success, "" if success else str(response))
+        
+        # Test public stats
+        success, response = self.make_request('GET', 'public/stats', expected_status=200, auth_required=False)
+        self.log_test("GET /api/public/stats", success, "" if success else str(response))
+        
+        # Test public projects
+        success, response = self.make_request('GET', 'public/projects', expected_status=200, auth_required=False)
+        self.log_test("GET /api/public/projects", success, "" if success else str(response))
+        
+        # Test public testimonials
+        success, response = self.make_request('GET', 'public/testimonials', expected_status=200, auth_required=False)
+        self.log_test("GET /api/public/testimonials", success, "" if success else str(response))
 
-    def test_create_enrollment(self):
-        """Test creating enrollment"""
-        if not self.test_student_id or not self.test_class_id:
-            print("❌ Missing student or class ID for enrollment")
+    def run_all_tests(self):
+        """Run all test suites"""
+        print("🚀 Starting Projeto Alegria CMS API Tests...")
+        print(f"Testing against: {self.base_url}")
+        
+        # Test authentication first
+        if not self.test_admin_login():
+            print("❌ Cannot proceed without admin authentication")
             return False
         
-        enrollment_data = {
-            "student_id": self.test_student_id,
-            "class_id": self.test_class_id,
-            "status": "active"
-        }
-        success, response = self.run_test("Create Enrollment", "POST", "enrollments", 200, data=enrollment_data)
-        if success and 'id' in response:
-            self.test_enrollment_id = response['id']
-            print(f"   Created enrollment with ID: {self.test_enrollment_id}")
-            return True
-        return False
-
-    def test_list_enrollments(self):
-        """Test listing enrollments"""
-        return self.run_test("List Enrollments", "GET", "enrollments", 200)
-
-    def test_create_payment(self):
-        """Test creating payment"""
-        if not self.test_student_id or not self.test_class_id:
-            print("❌ Missing student or class ID for payment")
-            return False
+        # Run all test suites
+        self.test_site_settings()
+        self.test_gallery_management()
+        self.test_projects_crud()
+        self.test_testimonials_crud()
+        self.test_contact_messages()
+        self.test_public_endpoints()
         
-        payment_data = {
-            "student_id": self.test_student_id,
-            "class_id": self.test_class_id,
-            "amount": 50.0,
-            "payment_date": datetime.now().strftime("%Y-%m-%d"),
-            "reference_month": datetime.now().strftime("%Y-%m"),
-            "payment_method": "cash",
-            "status": "paid"
-        }
-        return self.run_test("Create Payment", "POST", "payments", 200, data=payment_data)
-
-    def test_list_payments(self):
-        """Test listing payments"""
-        return self.run_test("List Payments", "GET", "payments", 200)
-
-    def test_create_cashflow(self):
-        """Test creating cash flow entry"""
-        cashflow_data = {
-            "type": "income",
-            "category": "Mensalidades",
-            "description": "Pagamento de mensalidade - Teste",
-            "amount": 100.0,
-            "due_date": datetime.now().strftime("%Y-%m-%d"),
-            "status": "paid"
-        }
-        return self.run_test("Create Cash Flow", "POST", "cashflow", 200, data=cashflow_data)
-
-    def test_list_cashflow(self):
-        """Test listing cash flow entries"""
-        return self.run_test("List Cash Flow", "GET", "cashflow", 200)
-
-    def test_attendance_bulk(self):
-        """Test bulk attendance creation"""
-        if not self.test_enrollment_id or not self.test_class_id:
-            print("❌ Missing enrollment or class ID for attendance")
-            return False
+        # Print summary
+        print(f"\n📊 Test Summary:")
+        print(f"Tests Run: {self.tests_run}")
+        print(f"Tests Passed: {self.tests_passed}")
+        print(f"Tests Failed: {len(self.failed_tests)}")
+        print(f"Success Rate: {(self.tests_passed/self.tests_run*100):.1f}%")
         
-        attendance_data = {
-            "class_id": self.test_class_id,
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "records": [
-                {
-                    "enrollment_id": self.test_enrollment_id,
-                    "status": "P",
-                    "notes": "Presente - Teste automatizado"
-                }
-            ]
-        }
-        return self.run_test("Bulk Attendance", "POST", "attendance/bulk", 200, data=attendance_data)
-
-    def test_list_attendance(self):
-        """Test listing attendance"""
-        return self.run_test("List Attendance", "GET", "attendance", 200)
-
-    def test_class_report(self):
-        """Test class report generation"""
-        if not self.test_class_id:
-            print("❌ No test class ID available for report")
-            return False
-        return self.run_test("Class Report", "GET", f"reports/class/{self.test_class_id}", 200)
-
-    def cleanup_test_data(self):
-        """Clean up test data"""
-        print("\n🧹 Cleaning up test data...")
+        if self.failed_tests:
+            print(f"\n❌ Failed Tests:")
+            for test in self.failed_tests:
+                print(f"  - {test['test']}: {test['details']}")
         
-        # Delete test student (this should cascade delete enrollments, payments, etc.)
-        if self.test_student_id:
-            success, _ = self.run_test("Delete Test Student", "DELETE", f"students/{self.test_student_id}", 200)
-            if success:
-                print("   Test student deleted successfully")
+        return len(self.failed_tests) == 0
 
 def main():
-    print("🚀 Starting Projeto Alegria API Testing...")
-    print("=" * 60)
-    
-    tester = ProjetoAlegraAPITester()
-    
-    # Test sequence
-    test_sequence = [
-        # Basic connectivity
-        ("Root API", tester.test_root_endpoint),
-        
-        # Public endpoints (no auth required)
-        ("Public Stats", tester.test_public_stats),
-        ("Public Classes", tester.test_public_classes),
-        ("Public Testimonials", tester.test_public_testimonials),
-        ("Contact Submission", tester.test_contact_submission),
-        
-        # Authentication
-        ("Admin Login", tester.test_admin_login),
-        ("Auth Me", tester.test_auth_me),
-        
-        # Dashboard
-        ("Dashboard Stats", tester.test_dashboard_stats),
-        
-        # Students management
-        ("Create Student", tester.test_create_student),
-        ("List Students", tester.test_list_students),
-        ("Get Student", tester.test_get_student),
-        ("Update Student", tester.test_update_student),
-        
-        # Classes management
-        ("List Classes", tester.test_list_classes),
-        ("Get Class", tester.test_get_class),
-        
-        # Enrollments
-        ("Create Enrollment", tester.test_create_enrollment),
-        ("List Enrollments", tester.test_list_enrollments),
-        
-        # Payments
-        ("Create Payment", tester.test_create_payment),
-        ("List Payments", tester.test_list_payments),
-        
-        # Cash Flow
-        ("Create Cash Flow", tester.test_create_cashflow),
-        ("List Cash Flow", tester.test_list_cashflow),
-        
-        # Attendance
-        ("Bulk Attendance", tester.test_attendance_bulk),
-        ("List Attendance", tester.test_list_attendance),
-        
-        # Reports
-        ("Class Report", tester.test_class_report),
-    ]
-    
-    # Run all tests
-    for test_name, test_func in test_sequence:
-        try:
-            test_func()
-        except Exception as e:
-            print(f"❌ {test_name} failed with exception: {str(e)}")
-    
-    # Cleanup
-    tester.cleanup_test_data()
-    
-    # Print results
-    print("\n" + "=" * 60)
-    print(f"📊 Test Results: {tester.tests_passed}/{tester.tests_run} tests passed")
-    success_rate = (tester.tests_passed / tester.tests_run * 100) if tester.tests_run > 0 else 0
-    print(f"📈 Success Rate: {success_rate:.1f}%")
-    
-    if tester.tests_passed == tester.tests_run:
-        print("🎉 All tests passed!")
-        return 0
-    else:
-        print("⚠️  Some tests failed. Check the output above for details.")
-        return 1
+    tester = ProjetoAlegriaAPITester()
+    success = tester.run_all_tests()
+    return 0 if success else 1
 
 if __name__ == "__main__":
     sys.exit(main())
