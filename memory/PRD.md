@@ -6,6 +6,9 @@ Sistema completo para gestão do Projeto Alegria - ONG que oferece atividades ar
 ## Data de Criação
 27/03/2026
 
+## Última Atualização
+27/03/2026 - CMS Completo implementado
+
 ## Arquitetura
 - **Frontend**: React.js com Tailwind CSS
 - **Backend**: FastAPI (Python)
@@ -13,7 +16,7 @@ Sistema completo para gestão do Projeto Alegria - ONG que oferece atividades ar
 - **Autenticação**: JWT
 
 ## User Personas
-1. **Administrador**: Gerencia alunos, turmas, pagamentos, fluxo de caixa, relatórios
+1. **Administrador**: Gerencia alunos, turmas, pagamentos, fluxo de caixa, relatórios, e TODO o conteúdo do site
 2. **Responsável**: Visualiza dados do aluno, histórico de pagamentos, frequência
 3. **Visitante**: Acessa site institucional, faz inscrição, entra em contato
 
@@ -26,38 +29,37 @@ Sistema completo para gestão do Projeto Alegria - ONG que oferece atividades ar
 6. Gestão de pagamentos
 7. Fluxo de caixa (contas a pagar e receber)
 8. Relatórios por turma (matriculados, faltas, pagamentos)
-9. Área do responsável
+9. **CMS Completo para edição do site**
 10. Login/autenticação
 
-## O que foi implementado (27/03/2026)
+## O que foi implementado
 
 ### Backend (100% Funcional)
 - ✅ API REST completa com FastAPI
 - ✅ Autenticação JWT (login/registro)
 - ✅ CRUD de Alunos (students)
-- ✅ CRUD de Turmas (classes) - 8 turmas iniciais: Zumba, Pilates, Natação Infantil 3-6 anos, Natação Infantil 7-12 anos, Jiu-Jitsu Infantil, Ballet Infantil, Hidroginástica, Funcional
+- ✅ CRUD de Turmas (classes)
 - ✅ Gestão de Matrículas (enrollments)
 - ✅ Controle de Presença em lote (attendance bulk)
 - ✅ Gestão de Pagamentos (payments)
-- ✅ Fluxo de Caixa (cashflow) - income/expense
-- ✅ Relatórios por turma com estatísticas
-- ✅ Dashboard com estatísticas gerais
-- ✅ Endpoints públicos (stats, classes, testimonials, contact)
-- ✅ Seeds de dados iniciais
+- ✅ Fluxo de Caixa (cashflow)
+- ✅ Relatórios por turma
+- ✅ Dashboard com estatísticas
+- ✅ **CMS - Site Settings** (editar textos, contato, redes sociais)
+- ✅ **CMS - Galeria de Fotos**
+- ✅ **CMS - Projetos**
+- ✅ **CMS - Depoimentos**
+- ✅ **CMS - Mensagens de Contato**
 
-### Frontend (90% Funcional)
-- ✅ Landing Page institucional com design Vibrant Play (azul/amarelo)
-- ✅ Seções: Hero, Sobre, Turmas, Depoimentos, Contato
-- ✅ Formulário de Contato funcional
-- ✅ Página de Inscrição
-- ✅ Login/Autenticação
-- ✅ Dashboard administrativo com estatísticas
-- ✅ Página de Gestão de Alunos (CRUD)
-- ✅ Página de Turmas
-- ✅ Página de Presença (estrutura)
-- ✅ Página de Pagamentos (estrutura)
-- ✅ Página de Fluxo de Caixa (CRUD completo)
-- ✅ Página de Relatórios por Turma
+### Frontend (100% Funcional)
+- ✅ Landing Page institucional
+- ✅ Dashboard administrativo
+- ✅ Gestão de alunos, turmas, fluxo de caixa
+- ✅ **Página Editar Site** (com abas: Hero, Sobre, Contato, Redes Sociais)
+- ✅ **Página Galeria** (adicionar/remover imagens)
+- ✅ **Página Projetos** (CRUD completo)
+- ✅ **Página Depoimentos** (CRUD completo)
+- ✅ **Página Mensagens** (visualizar, marcar status, excluir)
 
 ### Credenciais de Acesso
 - **Admin**: admin@projetoalegria.org / admin123
@@ -70,17 +72,14 @@ Sistema completo para gestão do Projeto Alegria - ONG que oferece atividades ar
 
 ### P1 (Importante)
 - [ ] Área do responsável (visualização de dados do aluno)
-- [ ] Notificações de pagamentos pendentes
-- [ ] Galeria de fotos/eventos
+- [ ] Upload de imagens direto (ao invés de URL)
 
 ### P2 (Melhorias)
-- [ ] Dashboard com gráficos visuais (Recharts)
+- [ ] Dashboard com gráficos visuais
 - [ ] Exportar relatórios em PDF
-- [ ] Envio de e-mail para novos cadastros
-- [ ] Recuperação de senha
+- [ ] Notificações por email/WhatsApp
 
 ## Próximas Tarefas
-1. Finalizar controle de presença com seleção de turma e alunos
-2. Implementar registro de pagamentos vinculado a alunos/turmas
-3. Criar área do responsável com visualização de dados
-4. Adicionar galeria de projetos/fotos
+1. Finalizar controle de presença
+2. Implementar registro de pagamentos
+3. Criar área do responsável
