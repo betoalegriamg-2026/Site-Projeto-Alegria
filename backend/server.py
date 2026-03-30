@@ -936,9 +936,22 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
 @api_router.get("/public/classes", response_model=List[ClassResponse])
 async def list_public_classes():
     classes = await db.classes.find({"status": "active"}, {"_id": 0}).to_list(100)
+    
+    if not classes:
+        return []
+    
+    # Batch query for enrollment counts using aggregation
+    class_ids = [c["id"] for c in classes]
+    pipeline = [
+        {"$match": {"class_id": {"$in": class_ids}, "status": "active"}},
+        {"$group": {"_id": "$class_id", "count": {"$sum": 1}}}
+    ]
+    counts = await db.enrollments.aggregate(pipeline).to_list(100)
+    enrollment_counts = {c["_id"]: c["count"] for c in counts}
+    
     result = []
     for c in classes:
-        count = await db.enrollments.count_documents({"class_id": c["id"], "status": "active"})
+        count = enrollment_counts.get(c["id"], 0)
         result.append(ClassResponse(**c, enrolled_count=count))
     return result
 
